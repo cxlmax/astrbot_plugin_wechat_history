@@ -125,7 +125,7 @@ class WeChatHistoryPlugin(Star):
 
     @filter.event_message_type(filter.EventMessageType.ALL)
     @filter.platform_adapter_type(filter.PlatformAdapterType.WECHATPADPRO)
-    async def save_message(self, event: AstrMessageEvent):
+    async def save_message(self, event: AstrMessageEvent, *args, **kwargs):
         '''监听所有微信消息并保存'''
         try:
             # 获取消息信息
