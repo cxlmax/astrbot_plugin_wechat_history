@@ -1,6 +1,6 @@
 # AstrBot 微信聊天记录保存插件
 
-[![Version](https://img.shields.io/badge/version-v1.0.0-blue.svg)](https://github.com/cxl/wechat_history)
+[![Version](https://img.shields.io/badge/version-v1.0.0-blue.svg)](https://github.com/cxl/astrbot_plugin_wechat_history)
 [![AstrBot](https://img.shields.io/badge/AstrBot-%3E%3D3.5.0-brightgreen.svg)](https://github.com/AstrBotDevs/AstrBot)
 [![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
 [![MySQL](https://img.shields.io/badge/MySQL-8.0+-orange.svg)](https://www.mysql.com/)
@@ -11,11 +11,11 @@
 
 - 🔄 **自动保存** - 实时保存所有微信聊天记录到数据库
 - 📸 **图片存储** - 自动保存聊天图片，按年月归档管理
-- 🎤 **语音处理** - 支持保存语音消息，可选转换 SILK 为 MP3 格式
+- 🎤 **语音保存** - 保存语音消息（SILK 原始格式）
 - 🔍 **全文搜索** - MySQL 全文索引，快速搜索历史聊天记录
 - 📊 **数据统计** - 实时统计消息数、用户数、媒体文件数
 - 🗂️ **智能归档** - 媒体文件按日期自动分类存储
-- ⚙️ **灵活配置** - 可独立控制图片、语音保存及格式转换
+- ⚙️ **灵活配置** - 可独立控制图片、语音保存
 
 ## 📋 前置要求
 
@@ -40,10 +40,8 @@ cd astrbot_plugin_wechat_history
 pip install -r requirements.txt
 ```
 
-依赖包括：
+依赖只有一个：
 - `mysql-connector-python` - MySQL 数据库连接
-- `silk-python` - SILK 语音格式解码
-- `pydub` - 音频格式转换
 
 ### 3. 创建数据库
 
@@ -69,7 +67,6 @@ exit;
 | `media_path` | 媒体文件存储路径 | `./data/wechat_media` |
 | `save_images` | 是否保存图片 | `true` |
 | `save_voices` | 是否保存语音 | `true` |
-| `convert_voice_to_mp3` | 是否转换语音为 MP3 | `false` |
 
 ### 5. 启动 AstrBot
 
@@ -153,11 +150,10 @@ python main.py
 |------|------|------|
 | file_id | BIGINT | 主键 |
 | file_type | ENUM | 文件类型（image/audio/video/file） |
-| original_format | VARCHAR(20) | 原始格式（silk/mp3/jpg 等） |
+| original_format | VARCHAR(20) | 原始格式（silk/jpg 等） |
 | file_path | VARCHAR(500) | 文件路径 |
 | original_path | VARCHAR(500) | 原始文件路径 |
 | file_size | BIGINT | 文件大小（字节） |
-| duration | INT | 时长（秒，仅音视频） |
 | created_at | TIMESTAMP | 创建时间 |
 
 ## 📁 文件存储结构
@@ -174,47 +170,30 @@ data/wechat_media/
 └── voices/
     └── 2025/
         └── 01/
-            ├── voice_001.silk   # 原始格式
-            └── voice_002.mp3    # 转换后（可选）
+            ├── voice_001.silk
+            └── voice_002.silk
 ```
 
 ## ⚙️ 配置建议
 
-### 场景 1：只保存记录，节省资源（推荐）
+### 场景 1：保存所有记录（推荐）
 
 ```json
 {
   "save_images": true,
-  "save_voices": true,
-  "convert_voice_to_mp3": false
+  "save_voices": true
 }
 ```
 
-✅ 保存速度快，CPU 占用低
-✅ 保留原始数据
-❌ SILK 格式需专用工具播放
+✅ 完整保存聊天记录
+✅ 保留所有媒体文件
 
-### 场景 2：需要方便播放语音
-
-```json
-{
-  "save_images": true,
-  "save_voices": true,
-  "convert_voice_to_mp3": true
-}
-```
-
-✅ MP3 通用格式，任何播放器可播放
-✅ 适合做语音数据分析
-❌ 消耗 CPU 资源，转换需要时间
-
-### 场景 3：只保存文本
+### 场景 2：只保存文本
 
 ```json
 {
   "save_images": false,
-  "save_voices": false,
-  "convert_voice_to_mp3": false
+  "save_voices": false
 }
 ```
 
@@ -228,22 +207,24 @@ data/wechat_media/
 **特点：**
 - ✅ 文件极小（~200KB/分钟）
 - ✅ 针对语音优化
-- ❌ 几乎所有播放器不支持
+- ❌ 大部分播放器不支持直接播放
 
 **播放方法：**
 
-1. **开启转换为 MP3**（推荐）
-   - 设置 `convert_voice_to_mp3: true`
-   - 插件自动转换为通用 MP3 格式
+需要使用专门的工具转换：
 
-2. **手动转换**
-   ```bash
-   # 使用 silk-python
-   python -c "import silk; silk.decode('voice.silk', 'voice.wav', rate=24000)"
+```bash
+# 安装转换工具
+pip install silk-python pydub
 
-   # 使用 ffmpeg 转 MP3
-   ffmpeg -i voice.wav -b:a 128k voice.mp3
-   ```
+# 转换为 WAV
+python -c "import silk; silk.decode('voice.silk', 'voice.wav', rate=24000)"
+
+# 使用 ffmpeg 转 MP3
+ffmpeg -i voice.wav -b:a 128k voice.mp3
+```
+
+**注意：** 本插件保存的是 SILK 原始格式，如需播放请自行转换。
 
 ## 🐛 常见问题
 
@@ -256,25 +237,7 @@ data/wechat_media/
 2. 确认数据库地址、用户名、密码配置正确
 3. 检查防火墙是否阻止连接
 
-### Q2: 语音转换失败
-
-**错误：** `语音转换失败: XXX`
-
-**解决：**
-1. 确保安装了 `ffmpeg`（pydub 依赖）
-   ```bash
-   # Ubuntu/Debian
-   apt install ffmpeg
-
-   # macOS
-   brew install ffmpeg
-
-   # Windows
-   # 下载 https://ffmpeg.org/download.html
-   ```
-2. 或关闭语音转换：`convert_voice_to_mp3: false`
-
-### Q3: 中文搜索不准确
+### Q2: 中文搜索不准确
 
 **解决：**
 确保数据库字符集正确：
@@ -282,7 +245,7 @@ data/wechat_media/
 ALTER DATABASE wechat_history CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
-### Q4: 媒体文件过多占用空间
+### Q3: 媒体文件过多占用空间
 
 **解决：**
 1. 定期清理旧文件（建议保留最近 3-6 个月）
@@ -322,8 +285,6 @@ ALTER DATABASE wechat_history CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 - [ ] 导出聊天记录为 HTML/PDF
 - [ ] 数据可视化面板
 - [ ] 支持 PostgreSQL
-- [ ] 消息加密存储
-- [ ] 备份和恢复工具
 - [ ] Web 查询界面
 
 ## 📄 开源协议
@@ -343,14 +304,13 @@ ALTER DATABASE wechat_history CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ## 📮 联系方式
 
 - 作者：chan
-- 项目地址：https://github.com/cxl/wechat_history
+- 项目地址：https://github.com/cxl/astrbot_plugin_wechat_history
 - AstrBot 官网：https://astrbot.app
 
 ## 🙏 鸣谢
 
 - [AstrBot](https://github.com/AstrBotDevs/AstrBot) - 强大的多平台机器人框架
-- [silk-python](https://github.com/foyoux/pilk) - SILK 音频编解码库
-- [pydub](https://github.com/jiaaro/pydub) - 音频处理库
+- [MySQL](https://www.mysql.com/) - 可靠的关系型数据库
 
 ---
 

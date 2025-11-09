@@ -1,3 +1,1 @@
 mysql-connector-python>=8.0.0
-silk-python>=0.2.6
-pydub>=0.25.1

@@ -16,12 +16,10 @@ import astrbot.api.message_components as Comp
 from datetime import datetime
 import os
 import asyncio
+import shutil
 
 # 数据库依赖
 import mysql.connector
-# 语音转换依赖
-import silk
-from pydub import AudioSegment
 
 @register(
     "wechat_history",
@@ -49,12 +47,11 @@ class WeChatHistoryPlugin(Star):
         # 媒体保存配置
         self.save_images = config.get('save_images', True)
         self.save_voices = config.get('save_voices', True)
-        self.convert_voice_to_mp3 = config.get('convert_voice_to_mp3', False)
 
         # 初始化数据库表
         asyncio.create_task(self.init_database())
 
-        logger.info(f"微信聊天记录插件已加载 [图片保存: {self.save_images}, 语音保存: {self.save_voices}, 语音转MP3: {self.convert_voice_to_mp3}]")
+        logger.info(f"微信聊天记录插件已加载 [图片保存: {self.save_images}, 语音保存: {self.save_voices}]")
 
     async def init_database(self):
         '''初始化数据库表结构'''
@@ -253,7 +250,7 @@ class WeChatHistoryPlugin(Star):
         return file_id
 
     async def save_voice(self, record_component: Record) -> int:
-        '''保存语音文件，可选转换为MP3'''
+        '''保存语音文件（原始SILK格式）'''
         silk_path = record_component.file
 
         # 按日期组织存储
@@ -266,59 +263,28 @@ class WeChatHistoryPlugin(Star):
         )
         os.makedirs(save_dir, exist_ok=True)
 
-        filename = os.path.basename(silk_path).replace('.silk', '')
-        final_path = silk_path
-        original_path = silk_path
-        file_format = 'silk'
-        duration = 0
+        # 直接复制SILK文件
+        filename = os.path.basename(silk_path)
+        dest_path = os.path.join(save_dir, filename)
 
-        # 根据配置决定是否转换为MP3
-        if self.convert_voice_to_mp3:
-            mp3_path = os.path.join(save_dir, f'{filename}.mp3')
-            temp_wav = os.path.join(save_dir, f'{filename}_temp.wav')
-
-            try:
-                # SILK转MP3
-                silk.decode(silk_path, temp_wav, rate=24000)
-                audio = AudioSegment.from_wav(temp_wav)
-                audio.export(mp3_path, format="mp3", bitrate="128k")
-
-                # 清理临时文件
-                if os.path.exists(temp_wav):
-                    os.remove(temp_wav)
-
-                final_path = mp3_path
-                file_format = 'mp3'
-                duration = len(audio) // 1000  # 秒
-                logger.debug(f"语音已转换为MP3: {mp3_path}")
-
-            except Exception as e:
-                logger.error(f"语音转换失败: {e}, 将保存原始SILK文件")
-                # 转换失败，保存原始SILK文件
-                import shutil
-                dest_silk = os.path.join(save_dir, os.path.basename(silk_path))
-                shutil.copy(silk_path, dest_silk)
-                final_path = dest_silk
-                file_format = 'silk'
-        else:
-            # 不转换，直接复制SILK文件
-            import shutil
-            dest_silk = os.path.join(save_dir, os.path.basename(silk_path))
-            shutil.copy(silk_path, dest_silk)
-            final_path = dest_silk
-            logger.debug(f"语音已保存(原始格式): {dest_silk}")
+        try:
+            shutil.copy(silk_path, dest_path)
+            logger.debug(f"语音已保存(原始格式): {dest_path}")
+        except Exception as e:
+            logger.error(f"语音保存失败: {e}")
+            dest_path = silk_path
 
         # 保存到数据库
         conn = mysql.connector.connect(**self.db_config)
         cursor = conn.cursor()
 
-        file_size = os.path.getsize(final_path) if os.path.exists(final_path) else 0
+        file_size = os.path.getsize(dest_path) if os.path.exists(dest_path) else 0
 
         cursor.execute('''
             INSERT INTO media_files
-            (file_type, file_path, original_path, file_size, duration, original_format)
-            VALUES (%s, %s, %s, %s, %s, %s)
-        ''', ('audio', final_path, original_path, file_size, duration, file_format))
+            (file_type, file_path, original_path, file_size, original_format)
+            VALUES (%s, %s, %s, %s, %s)
+        ''', ('audio', dest_path, silk_path, file_size, 'silk'))
 
         file_id = cursor.lastrowid
 

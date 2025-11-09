@@ -39,13 +39,7 @@
   "save_voices": {
     "description": "是否保存语音",
     "type": "bool",
-    "hint": "开启后会保存所有语音到本地",
+    "hint": "开启后会保存所有语音到本地（SILK原始格式）",
     "default": true
-  },
-  "convert_voice_to_mp3": {
-    "description": "是否将SILK语音转换为MP3",
-    "type": "bool",
-    "hint": "转换需要消耗CPU资源，但MP3更通用易播放。关闭则保存原始SILK格式",
-    "default": false
   }
 }
