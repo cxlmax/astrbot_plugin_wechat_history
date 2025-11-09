@@ -35,6 +35,7 @@ class WeChatHistoryPlugin(Star):
         # 初始化数据库连接配置
         self.db_config = {
             'host': config.get('db_host', 'localhost'),
+            'port': config.get('db_port', 3306),
             'user': config.get('db_user', 'root'),
             'password': config.get('db_password', ''),
             'database': config.get('db_name', 'wechat_history'),

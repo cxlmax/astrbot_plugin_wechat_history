@@ -5,6 +5,12 @@
     "hint": "默认 localhost",
     "default": "localhost"
   },
+  "db_port": {
+    "description": "MySQL数据库端口",
+    "type": "int",
+    "hint": "MySQL默认端口 3306",
+    "default": 3306
+  },
   "db_user": {
     "description": "数据库用户名",
     "type": "string",
