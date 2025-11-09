@@ -17,6 +17,8 @@ from datetime import datetime
 import os
 import asyncio
 import shutil
+import base64
+import uuid
 
 # 数据库依赖
 import mysql.connector
@@ -209,10 +211,7 @@ class WeChatHistoryPlugin(Star):
         return conv_id
 
     async def save_image(self, image_component: Image) -> int:
-        '''保存图片文件'''
-        # 获取图片路径
-        image_path = image_component.file
-
+        '''保存图片文件（支持Base64和文件路径两种方式）'''
         # 按日期组织存储
         now = datetime.now()
         save_dir = os.path.join(
@@ -223,24 +222,47 @@ class WeChatHistoryPlugin(Star):
         )
         os.makedirs(save_dir, exist_ok=True)
 
-        # 复制文件（如果是本地文件）
-        import shutil
-        filename = os.path.basename(image_path)
-        dest_path = os.path.join(save_dir, filename)
+        image_data = image_component.file
+        dest_path = None
 
-        if os.path.exists(image_path):
-            shutil.copy(image_path, dest_path)
+        # 判断是Base64数据还是文件路径
+        # WeChatPadPro返回的是Base64，其他适配器可能返回文件路径
+        if image_data and os.path.exists(image_data):
+            # 是本地文件路径
+            filename = os.path.basename(image_data)
+            dest_path = os.path.join(save_dir, filename)
+            shutil.copy(image_data, dest_path)
+            logger.debug(f"图片已保存(文件): {dest_path}")
+        else:
+            # 尝试作为Base64处理
+            try:
+                # 解码Base64数据
+                image_bytes = base64.b64decode(image_data)
+
+                # 生成唯一文件名（时间戳 + 随机字符串）
+                filename = f"{int(now.timestamp() * 1000)}_{uuid.uuid4().hex[:8]}.jpg"
+                dest_path = os.path.join(save_dir, filename)
+
+                # 保存图片文件
+                with open(dest_path, 'wb') as f:
+                    f.write(image_bytes)
+
+                logger.debug(f"图片已保存(Base64): {dest_path}")
+            except Exception as e:
+                logger.error(f"Base64图片保存失败: {e}")
+                # 如果保存失败，使用空路径
+                dest_path = ""
 
         # 保存到数据库
         conn = mysql.connector.connect(**self.db_config)
         cursor = conn.cursor()
 
-        file_size = os.path.getsize(dest_path) if os.path.exists(dest_path) else 0
+        file_size = os.path.getsize(dest_path) if dest_path and os.path.exists(dest_path) else 0
 
         cursor.execute('''
             INSERT INTO media_files (file_type, file_path, file_size, original_format)
             VALUES (%s, %s, %s, %s)
-        ''', ('image', dest_path, file_size, 'jpg'))
+        ''', ('image', dest_path or '', file_size, 'jpg'))
 
         file_id = cursor.lastrowid
 
