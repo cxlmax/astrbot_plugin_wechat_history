@@ -1,0 +1,51 @@
+{
+  "db_host": {
+    "description": "MySQL数据库地址",
+    "type": "string",
+    "hint": "默认 localhost",
+    "default": "localhost"
+  },
+  "db_user": {
+    "description": "数据库用户名",
+    "type": "string",
+    "hint": "默认 root",
+    "default": "root"
+  },
+  "db_password": {
+    "description": "数据库密码",
+    "type": "string",
+    "hint": "请妥善保管密码",
+    "obvious_hint": true,
+    "default": ""
+  },
+  "db_name": {
+    "description": "数据库名称",
+    "type": "string",
+    "hint": "用于存储聊天记录的数据库",
+    "default": "wechat_history"
+  },
+  "media_path": {
+    "description": "媒体文件存储路径",
+    "type": "string",
+    "hint": "建议使用绝对路径，相对路径基于AstrBot根目录",
+    "default": "./data/wechat_media"
+  },
+  "save_images": {
+    "description": "是否保存图片",
+    "type": "bool",
+    "hint": "开启后会保存所有图片到本地",
+    "default": true
+  },
+  "save_voices": {
+    "description": "是否保存语音",
+    "type": "bool",
+    "hint": "开启后会保存所有语音到本地",
+    "default": true
+  },
+  "convert_voice_to_mp3": {
+    "description": "是否将SILK语音转换为MP3",
+    "type": "bool",
+    "hint": "转换需要消耗CPU资源，但MP3更通用易播放。关闭则保存原始SILK格式",
+    "default": false
+  }
+}

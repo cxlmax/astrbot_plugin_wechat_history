@@ -1,0 +1,5 @@
+name: wechat_history
+desc: 微信聊天记录自动保存到MySQL数据库，支持图片、语音存储和全文搜索
+version: v1.0.0
+author: chan
+repo: https://github.com/cxl/wechat_history.git
