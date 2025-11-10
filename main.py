@@ -19,6 +19,7 @@ import asyncio
 import shutil
 import base64
 import uuid
+import json
 
 # 数据库依赖
 import mysql.connector
@@ -94,6 +95,7 @@ class WeChatHistoryPlugin(Star):
                     msg_type SMALLINT NOT NULL COMMENT '1文本|3图片|34语音',
                     content TEXT,
                     media_file_id BIGINT UNSIGNED,
+                    raw_message JSON COMMENT '原始消息JSON',
                     create_time TIMESTAMP NOT NULL,
                     INDEX idx_conversation_time (conversation_id, create_time DESC),
                     INDEX idx_sender_time (sender_id, create_time DESC),
@@ -166,7 +168,8 @@ class WeChatHistoryPlugin(Star):
                 msg_type,
                 message_str,
                 media_file_id,
-                timestamp
+                timestamp,
+                json.dumps(msg_obj.raw_message, ensure_ascii=False)  # 原始消息JSON字符串
             )
 
         except Exception as e:
@@ -225,8 +228,11 @@ class WeChatHistoryPlugin(Star):
         dest_path = None
 
         try:
-            # 直接使用适配器下载好的Base64数据（适配器已经完整下载了）
-            image_bytes = base64.b64decode(image_component.file)
+            # 使用官方的 convert_to_base64() 方法，会自动去掉 base64:// 前缀
+            base64_str = await image_component.convert_to_base64()
+
+            # 解码Base64数据
+            image_bytes = base64.b64decode(base64_str)
 
             # 生成唯一文件名
             filename = f"{int(now.timestamp() * 1000)}_{uuid.uuid4().hex[:8]}.jpg"
@@ -308,16 +314,16 @@ class WeChatHistoryPlugin(Star):
 
         return file_id
 
-    async def save_message_to_db(self, conv_id, user_id, msg_type, content, media_file_id, create_time):
+    async def save_message_to_db(self, conv_id, user_id, msg_type, content, media_file_id, create_time, raw_message):
         '''保存消息记录'''
         conn = mysql.connector.connect(**self.db_config)
         cursor = conn.cursor()
 
         cursor.execute('''
             INSERT INTO messages
-            (conversation_id, sender_id, msg_type, content, media_file_id, create_time)
-            VALUES (%s, %s, %s, %s, %s, %s)
-        ''', (conv_id, user_id, msg_type, content, media_file_id, create_time))
+            (conversation_id, sender_id, msg_type, content, media_file_id, raw_message, create_time)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        ''', (conv_id, user_id, msg_type, content, media_file_id, raw_message, create_time))
 
         conn.commit()
         cursor.close()
