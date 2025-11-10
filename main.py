@@ -152,7 +152,7 @@ class WeChatHistoryPlugin(Star):
                     # 保存图片
                     msg_type = 3
                     if self.save_images:
-                        media_file_id = await self.save_image(component)
+                        media_file_id = await self.save_image(event, component)
                 elif isinstance(component, Record):
                     # 保存语音
                     msg_type = 34
@@ -210,8 +210,8 @@ class WeChatHistoryPlugin(Star):
         conn.close()
         return conv_id
 
-    async def save_image(self, image_component: Image) -> int:
-        '''保存图片文件（支持Base64和文件路径两种方式）'''
+    async def save_image(self, event: AstrMessageEvent, image_component: Image) -> int:
+        '''保存图片文件（使用适配器下载的完整图片）'''
         # 按日期组织存储
         now = datetime.now()
         save_dir = os.path.join(
@@ -222,36 +222,27 @@ class WeChatHistoryPlugin(Star):
         )
         os.makedirs(save_dir, exist_ok=True)
 
-        image_data = image_component.file
         dest_path = None
 
-        # 判断是Base64数据还是文件路径
-        # WeChatPadPro返回的是Base64，其他适配器可能返回文件路径
-        if image_data and os.path.exists(image_data):
-            # 是本地文件路径
-            filename = os.path.basename(image_data)
+        try:
+            # 直接使用适配器下载好的Base64数据（适配器已经完整下载了）
+            image_bytes = base64.b64decode(image_component.file)
+
+            # 生成唯一文件名
+            filename = f"{int(now.timestamp() * 1000)}_{uuid.uuid4().hex[:8]}.jpg"
             dest_path = os.path.join(save_dir, filename)
-            shutil.copy(image_data, dest_path)
-            logger.debug(f"图片已保存(文件): {dest_path}")
-        else:
-            # 尝试作为Base64处理
-            try:
-                # 解码Base64数据
-                image_bytes = base64.b64decode(image_data)
 
-                # 生成唯一文件名（时间戳 + 随机字符串）
-                filename = f"{int(now.timestamp() * 1000)}_{uuid.uuid4().hex[:8]}.jpg"
-                dest_path = os.path.join(save_dir, filename)
+            # 保存图片文件
+            with open(dest_path, 'wb') as f:
+                f.write(image_bytes)
 
-                # 保存图片文件
-                with open(dest_path, 'wb') as f:
-                    f.write(image_bytes)
+            logger.info(f"图片已保存: {dest_path} ({len(image_bytes)} bytes)")
 
-                logger.debug(f"图片已保存(Base64): {dest_path}")
-            except Exception as e:
-                logger.error(f"Base64图片保存失败: {e}")
-                # 如果保存失败，使用空路径
-                dest_path = ""
+        except Exception as e:
+            logger.error(f"图片保存失败: {e}")
+            import traceback
+            traceback.print_exc()
+            dest_path = ""
 
         # 保存到数据库
         conn = mysql.connector.connect(**self.db_config)
